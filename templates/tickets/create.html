@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block title %}New Ticket{% endblock %}
+{% block page_title %}Create New Ticket{% endblock %}
+{% block page_subtitle %}Submit a concern or issue for tracking{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl">
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="px-6 py-5 border-b border-slate-200 bg-slate-50">
+      <h2 class="text-sm font-semibold text-slate-800">Ticket Information</h2>
+      <p class="text-xs text-slate-500 mt-0.5">Fill in the details below to create a new ticket</p>
+    </div>
+
+    <form method="POST" class="p-6 space-y-5">
+      <!-- Title -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1.5">
+          Title <span class="text-red-500">*</span>
+        </label>
+        <input type="text" name="title" required maxlength="200"
+          value="{{ request.form.get('title', '') }}"
+          class="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition text-slate-900 placeholder-slate-400"
+          placeholder="Brief, descriptive title of the issue" />
+      </div>
+
+      <!-- Description -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1.5">
+          Description <span class="text-red-500">*</span>
+        </label>
+        <textarea name="description" required rows="6"
+          class="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition text-slate-900 placeholder-slate-400 resize-none"
+          placeholder="Describe the issue in detail. Include steps to reproduce, expected behavior, and actual behavior…">{{ request.form.get('description', '') }}</textarea>
+      </div>
+
+      <!-- Row: Priority + Category -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">Priority</label>
+          <select name="priority"
+            class="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none bg-white text-slate-900">
+            {% for p in priority_choices %}
+            <option value="{{ p }}" {{ 'selected' if request.form.get('priority', 'Medium') == p }}>{{ p }}</option>
+            {% endfor %}
+          </select>
+          <p class="text-xs text-slate-400 mt-1">Select the urgency level of this issue</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1.5">Category</label>
+          <select name="category"
+            class="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none bg-white text-slate-900">
+            {% for c in category_choices %}
+            <option value="{{ c }}" {{ 'selected' if request.form.get('category', 'General') == c }}>{{ c }}</option>
+            {% endfor %}
+          </select>
+          <p class="text-xs text-slate-400 mt-1">Categorize the type of issue</p>
+        </div>
+      </div>
+
+      <!-- Assign to IT Support (only shown if IT Support/Admin users exist) -->
+      {% if agents %}
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1.5">Assign to IT Support <span class="text-slate-400 font-normal">(optional)</span></label>
+        <select name="assigned_to"
+          class="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none bg-white text-slate-900">
+          <option value="">— Unassigned —</option>
+          {% for agent in agents %}
+          <option value="{{ agent.id }}" {{ 'selected' if request.form.get('assigned_to', '') == agent.id|string }}>
+            {{ agent.username }} ({{ role_label(agent.role) }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <!-- Priority reference card -->
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+        <p class="text-xs font-semibold text-slate-600 mb-3">Priority Guide</p>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <div class="flex items-start gap-2">
+            <span class="badge bg-emerald-100 text-emerald-700 mt-0.5">Low</span>
+            <span class="text-slate-500">Minor issue, no urgency</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <span class="badge bg-blue-100 text-blue-700 mt-0.5">Medium</span>
+            <span class="text-slate-500">Affects workflow, workaround exists</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <span class="badge bg-orange-100 text-orange-700 mt-0.5">High</span>
+            <span class="text-slate-500">Major impact, needs prompt action</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <span class="badge bg-red-100 text-red-700 mt-0.5">Critical</span>
+            <span class="text-slate-500">System down or data loss risk</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex items-center gap-3 pt-2 border-t border-slate-200">
+        <button type="submit"
+          class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
+          Submit Ticket
+        </button>
+        <a href="{{ url_for('ticket_list') }}"
+           class="px-5 py-2.5 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+          Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

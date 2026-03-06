@@ -1,0 +1,298 @@
+{% extends 'base.html' %}
+{% block title %}{{ ticket.ticket_id }}{% endblock %}
+{% block page_title %}{{ ticket.ticket_id }}{% endblock %}
+{% block page_subtitle %}{{ ticket.title }}{% endblock %}
+
+{% macro status_badge(status) %}
+{% if status == 'Open' %}<span class="badge bg-blue-100 text-blue-700 text-sm px-3 py-1">{{ status }}</span>
+{% elif status == 'In Progress' %}<span class="badge bg-amber-100 text-amber-700 text-sm px-3 py-1">{{ status }}</span>
+{% elif status == 'Under Review' %}<span class="badge bg-purple-100 text-purple-700 text-sm px-3 py-1">{{ status }}</span>
+{% elif status == 'Resolved' %}<span class="badge bg-emerald-100 text-emerald-700 text-sm px-3 py-1">{{ status }}</span>
+{% else %}<span class="badge bg-slate-100 text-slate-600 text-sm px-3 py-1">{{ status }}</span>{% endif %}
+{% endmacro %}
+
+{% macro priority_badge(priority) %}
+{% if priority == 'Low' %}<span class="badge bg-emerald-100 text-emerald-700">{{ priority }}</span>
+{% elif priority == 'Medium' %}<span class="badge bg-blue-100 text-blue-700">{{ priority }}</span>
+{% elif priority == 'High' %}<span class="badge bg-orange-100 text-orange-700">{{ priority }}</span>
+{% elif priority == 'Critical' %}<span class="badge bg-red-100 text-red-700">{{ priority }}</span>
+{% else %}<span class="badge bg-slate-100 text-slate-600">{{ priority }}</span>{% endif %}
+{% endmacro %}
+
+{% block header_actions %}
+{% set can_edit = current_user.id == ticket.created_by_id or current_user.role in ('it_support', 'admin') %}
+{% if current_user.role in ('it_support', 'admin') and not ticket.assigned_to_id %}
+<form method="POST" action="{{ url_for('claim_ticket', ticket_id=ticket.ticket_id) }}">
+  <button type="submit"
+    class="inline-flex items-center gap-2 text-sm font-medium text-emerald-700 border border-emerald-300 bg-emerald-50 rounded-lg px-4 py-2 hover:bg-emerald-100 transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11"/>
+    </svg>
+    Claim Ticket
+  </button>
+</form>
+{% endif %}
+{% if can_edit %}
+<a href="{{ url_for('edit_ticket', ticket_id=ticket.ticket_id) }}"
+   class="inline-flex items-center gap-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg px-4 py-2 hover:bg-slate-50 transition-colors">
+  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+  </svg>
+  Edit
+</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+  <!-- Left: Main content -->
+  <div class="lg:col-span-2 space-y-5">
+
+    <!-- Ticket body -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm">
+      <div class="px-6 py-5 border-b border-slate-200">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex-1">
+            <h1 class="text-lg font-semibold text-slate-900 leading-tight">{{ ticket.title }}</h1>
+            <div class="flex items-center gap-2 mt-2 flex-wrap">
+              {{ status_badge(ticket.status) }}
+              {{ priority_badge(ticket.priority) }}
+              <span class="text-xs text-slate-400">{{ ticket.category }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="px-6 py-5">
+        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Description</h3>
+        <div class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{{ ticket.description }}</div>
+      </div>
+    </div>
+
+    <!-- Quick status update (IT Support/admins) -->
+    {% if current_user.role in ('it_support', 'admin') %}
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Quick Status Update</h3>
+      <div class="flex flex-wrap gap-2" id="status-buttons">
+        {% for status in status_choices %}
+        <button onclick="updateStatus('{{ status }}')"
+          class="px-4 py-2 text-xs font-semibold rounded-lg border transition-all
+          {% if ticket.status == status %}
+            {% if status == 'Open' %}bg-blue-100 text-blue-700 border-blue-200
+            {% elif status == 'In Progress' %}bg-amber-100 text-amber-700 border-amber-200
+            {% elif status == 'Under Review' %}bg-purple-100 text-purple-700 border-purple-200
+            {% elif status == 'Resolved' %}bg-emerald-100 text-emerald-700 border-emerald-200
+            {% else %}bg-slate-100 text-slate-700 border-slate-200{% endif %}
+            ring-2 ring-offset-1
+            {% if status == 'Open' %}ring-blue-400
+            {% elif status == 'In Progress' %}ring-amber-400
+            {% elif status == 'Under Review' %}ring-purple-400
+            {% elif status == 'Resolved' %}ring-emerald-400
+            {% else %}ring-slate-400{% endif %}
+          {% else %}
+            bg-white text-slate-600 border-slate-300 hover:border-slate-400 hover:bg-slate-50
+          {% endif %}">
+          {{ status }}
+        </button>
+        {% endfor %}
+      </div>
+      <p class="text-xs text-slate-400 mt-2" id="status-feedback"></p>
+    </div>
+    {% endif %}
+
+    <!-- Comments -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm">
+      <div class="px-6 py-4 border-b border-slate-200">
+        <h3 class="text-sm font-semibold text-slate-800">
+          Comments
+          <span class="ml-2 text-xs font-normal text-slate-400">{{ ticket.comments.count() }}</span>
+        </h3>
+      </div>
+
+      <!-- Comment list -->
+      <div class="divide-y divide-slate-100">
+        {% for comment in ticket.comments %}
+        <div class="px-6 py-4">
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0 text-indigo-700 text-xs font-bold mt-0.5">
+              {{ comment.author.initials }}
+            </div>
+            <div class="flex-1">
+              <div class="flex items-baseline gap-2">
+                <span class="text-sm font-semibold text-slate-800">{{ comment.author.username }}</span>
+                <span class="text-xs text-slate-400">{{ comment.created_at.strftime('%b %d, %Y at %H:%M') }}</span>
+                {% if comment.author.role in ('it_support', 'admin') %}
+                <span class="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">{{ role_label(comment.author.role) }}</span>
+                {% endif %}
+              </div>
+              <p class="text-sm text-slate-700 mt-1.5 leading-relaxed whitespace-pre-wrap">{{ comment.content }}</p>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="px-6 py-10 text-center">
+          <svg class="w-8 h-8 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+          </svg>
+          <p class="text-sm text-slate-400">No comments yet. Be the first to respond.</p>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Add comment -->
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 rounded-b-xl">
+        <form method="POST" action="{{ url_for('add_comment', ticket_id=ticket.ticket_id) }}">
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0 text-indigo-700 text-xs font-bold mt-0.5">
+              {{ current_user.initials }}
+            </div>
+            <div class="flex-1">
+              <textarea name="content" rows="3" required
+                placeholder="Add a comment or update…"
+                class="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition resize-none bg-white"></textarea>
+              <div class="flex justify-end mt-2">
+                <button type="submit"
+                  class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+                  Post Comment
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right: Sidebar info -->
+  <div class="space-y-4">
+
+    <!-- Details card -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Ticket Details</h3>
+      <dl class="space-y-3.5">
+        <div>
+          <dt class="text-xs text-slate-400 mb-1">Ticket ID</dt>
+          <dd class="font-mono text-sm font-bold text-indigo-600">{{ ticket.ticket_id }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-slate-400 mb-1">Status</dt>
+          <dd>{{ status_badge(ticket.status) }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-slate-400 mb-1">Priority</dt>
+          <dd>{{ priority_badge(ticket.priority) }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-slate-400 mb-1">Category</dt>
+          <dd class="text-sm text-slate-700">{{ ticket.category }}</dd>
+        </div>
+        <div class="pt-1 border-t border-slate-100">
+          <dt class="text-xs text-slate-400 mb-1">Submitted By</dt>
+          <dd class="flex items-center gap-2">
+            <div class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-bold flex-shrink-0">
+              {{ ticket.creator.initials }}
+            </div>
+            <span class="text-sm text-slate-700 font-medium">{{ ticket.creator.username }}</span>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-xs text-slate-400 mb-1">Assigned To</dt>
+          <dd>
+            {% if ticket.assignee %}
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-xs font-bold flex-shrink-0">
+                {{ ticket.assignee.initials }}
+              </div>
+              <span class="text-sm text-slate-700 font-medium">{{ ticket.assignee.username }}</span>
+            </div>
+            {% else %}
+            <span class="text-sm text-slate-400 italic">Unassigned</span>
+            {% endif %}
+          </dd>
+        </div>
+        <div class="pt-1 border-t border-slate-100">
+          <dt class="text-xs text-slate-400 mb-1">Created</dt>
+          <dd class="text-sm text-slate-700">{{ ticket.created_at.strftime('%b %d, %Y') }}</dd>
+          <dd class="text-xs text-slate-400">{{ ticket.created_at.strftime('%H:%M UTC') }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-slate-400 mb-1">Last Updated</dt>
+          <dd class="text-sm text-slate-700">{{ ticket.updated_at.strftime('%b %d, %Y') }}</dd>
+          <dd class="text-xs text-slate-400">{{ ticket.updated_at.strftime('%H:%M UTC') }}</dd>
+        </div>
+      </dl>
+    </div>
+
+    <!-- Activity log -->
+    {% if logs %}
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Activity Log</h3>
+      <div class="space-y-3">
+        {% for log in logs[:10] %}
+        <div class="flex items-start gap-2.5">
+          <div class="w-5 h-5 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <svg class="w-2.5 h-2.5 text-indigo-400" fill="currentColor" viewBox="0 0 8 8">
+              <circle cx="4" cy="4" r="3"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-xs text-slate-700 leading-relaxed">
+              <span class="font-medium">{{ log.user.username }}</span> — {{ log.action }}
+            </p>
+            <p class="text-xs text-slate-400 mt-0.5">{{ log.created_at.strftime('%b %d, %H:%M') }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Danger zone (delete) -->
+    {% if current_user.role == 'admin' or current_user.id == ticket.created_by_id %}
+    {% if ticket.status in ('Resolved', 'Closed') or current_user.role == 'admin' %}
+    <div class="bg-red-50 border border-red-200 rounded-xl p-5">
+      <h3 class="text-xs font-semibold text-red-600 uppercase tracking-wider mb-2">Danger Zone</h3>
+      <p class="text-xs text-red-500 mb-3">Deleting a ticket is permanent and cannot be undone.</p>
+      <form method="POST" action="{{ url_for('delete_ticket', ticket_id=ticket.ticket_id) }}"
+            onsubmit="return confirm('Are you sure you want to permanently delete this ticket?')">
+        <button type="submit"
+          class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors">
+          Delete Ticket
+        </button>
+      </form>
+    </div>
+    {% endif %}
+    {% endif %}
+
+  </div>
+</div>
+
+{% block scripts %}
+<script>
+function updateStatus(newStatus) {
+  const feedback = document.getElementById('status-feedback');
+  feedback.textContent = 'Updating…';
+
+  fetch('{{ url_for("update_status", ticket_id=ticket.ticket_id) }}', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'status=' + encodeURIComponent(newStatus)
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      feedback.textContent = '✓ Status updated to "' + newStatus + '"';
+      setTimeout(() => location.reload(), 800);
+    } else {
+      feedback.textContent = 'Error: ' + (data.error || 'Unknown error');
+    }
+  })
+  .catch(() => { feedback.textContent = 'Network error. Please try again.'; });
+}
+</script>
+{% endblock %}
+{% endblock %}
