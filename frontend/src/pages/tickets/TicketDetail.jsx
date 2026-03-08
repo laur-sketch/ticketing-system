@@ -30,8 +30,6 @@ export default function TicketDetail() {
   const [statusSaving, setStatusSaving] = useState(false)
   const [deleteModal, setDeleteModal]     = useState(false)
   const [deleting, setDeleting]           = useState(false)
-  const [archiveModal, setArchiveModal]   = useState(false)
-  const [archiving, setArchiving]         = useState(false)
   const [restoreModal, setRestoreModal]   = useState(false)
   const [restoring, setRestoring]         = useState(false)
 
@@ -76,9 +74,6 @@ export default function TicketDetail() {
   const canDelete  = ticket && !ticket.is_archived && (
     isAdmin || (isOwner && ['Open', 'In Progress'].includes(ticket.status))
   )
-  const canArchive = ticket && isAdmin && !ticket.is_archived &&
-    ['Resolved', 'Closed'].includes(ticket.status)
-
   const submitComment = async e => {
     e.preventDefault()
     if (!comment.trim()) return
@@ -124,19 +119,6 @@ export default function TicketDetail() {
     } finally { setDeleting(false) }
   }
 
-  const archiveTicket = async () => {
-    setArchiving(true)
-    try {
-      const res = await api.post(`/tickets/${ticketId}/archive`, {})
-      addToast('Ticket archived successfully.', 'success')
-      setArchiveModal(false)
-      setData(prev => ({ ...prev, ticket: res.ticket }))
-    } catch (err) {
-      addToast(err.message, 'error')
-      setArchiveModal(false)
-    } finally { setArchiving(false) }
-  }
-
   const restoreTicket = async () => {
     setRestoring(true)
     try {
@@ -174,26 +156,14 @@ export default function TicketDetail() {
               </Link>
             )}
             {isAdmin && (
-              <>
-                <button
-                  disabled
-                  title="Already archived"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 bg-slate-100 rounded-lg px-3 py-1.5 cursor-not-allowed"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                  </svg>
-                  Archive
-                </button>
-                <button onClick={() => setRestoreModal(true)}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-3 py-1.5 transition-colors">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Restore Ticket
-                </button>
-              </>
+              <button onClick={() => setRestoreModal(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-3 py-1.5 transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Restore Ticket
+              </button>
             )}
           </div>
         </div>
@@ -209,13 +179,6 @@ export default function TicketDetail() {
               className="inline-flex items-center gap-2 text-sm font-medium text-blue-700 border border-blue-300 bg-blue-50 rounded-lg px-4 py-2 hover:bg-blue-100 transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" /></svg>
               Claim Ticket
-            </button>
-          )}
-          {canArchive && (
-            <button onClick={() => setArchiveModal(true)}
-              className="inline-flex items-center gap-2 text-sm font-medium text-blue-700 border border-blue-300 bg-blue-50 rounded-lg px-4 py-2 hover:bg-blue-100 transition-colors">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
-              Archive
             </button>
           )}
           {canEdit && (
@@ -439,16 +402,6 @@ export default function TicketDetail() {
         message={`Are you sure you want to delete ticket ${ticket.ticket_id}? This action cannot be undone and the ticket will be permanently removed.`}
         confirmLabel="Yes, Delete Ticket"
         confirmClass="btn-danger"
-      />
-      <ConfirmModal
-        isOpen={archiveModal}
-        onClose={() => setArchiveModal(false)}
-        onConfirm={archiveTicket}
-        loading={archiving}
-        title="Archive Ticket"
-        message={`Archive ticket ${ticket.ticket_id}? It will be moved to the Archive and hidden from active views. You can still view it in the Admin Archive page.`}
-        confirmLabel="Yes, Archive It"
-        confirmClass="px-4 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors"
       />
       <ConfirmModal
         isOpen={restoreModal}
