@@ -320,5 +320,4 @@ ticket_system/
 ## Idle Auto-Logout
 
 The system automatically logs out users after **2 minutes of inactivity** to protect sensitive data. A warning banner appears before logout giving users a chance to stay logged in.
-#   t i c k e t i n g - s y s t e m _ 2  
- 
+#
