@@ -8,7 +8,7 @@ pipeline {
 
   environment {
     // Adjust if you use a different Python/Node version on your agents
-    PYTHON = 'C:/Users/jlsms/AppData/Local/Programs/Python/Python312/python.exe'
+    PYTHON = 'py'
     NODEJS = 'node'
   }
 
