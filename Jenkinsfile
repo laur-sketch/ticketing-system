@@ -8,7 +8,7 @@ pipeline {
 
   environment {
     // Adjust if you use a different Python/Node version on your agents
-    PYTHON = 'python'
+    PYTHON = 'C:\\Users\\YourName\\AppData\\Local\\Programs\\Python\\Python312\\python.exe'
     NODEJS = 'node'
   }
 
@@ -24,8 +24,8 @@ pipeline {
         script {
           // On Windows agents, install Python deps from requirements.txt in workspace root if present
           if (fileExists('requirements.txt')) {
-            bat "${env.PYTHON} -m pip install --upgrade pip"
-            bat "${env.PYTHON} -m pip install -r requirements.txt"
+            bat "\"${env.PYTHON}\" -m pip install --upgrade pip"
+            bat "\"${env.PYTHON}\" -m pip install --upgrade pip"
           } else {
             echo 'No requirements.txt found; skipping backend setup.'
           }
