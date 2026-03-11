@@ -21,12 +21,13 @@ pipeline {
 
     stage('Setup Backend') {
       steps {
-        dir('backend') {
-          script {
-            if (fileExists('requirements.txt')) {
-              sh "${env.PYTHON} -m pip install --upgrade pip"
-              sh "${env.PYTHON} -m pip install -r requirements.txt"
-            }
+        script {
+          // On Windows agents, install Python deps from requirements.txt in workspace root if present
+          if (fileExists('requirements.txt')) {
+            bat "${env.PYTHON} -m pip install --upgrade pip"
+            bat "${env.PYTHON} -m pip install -r requirements.txt"
+          } else {
+            echo 'No requirements.txt found; skipping backend setup.'
           }
         }
       }
@@ -37,7 +38,7 @@ pipeline {
         dir('frontend') {
           script {
             if (fileExists('package.json')) {
-              sh "npm install"
+              bat "npm install"
             }
           }
         }
@@ -46,16 +47,14 @@ pipeline {
 
     stage('Backend Tests') {
       when {
-        expression { fileExists('backend') }
+        expression { fileExists('pytest.ini') || fileExists('tests') }
       }
       steps {
-        dir('backend') {
-          script {
-            if (fileExists('pytest.ini') || fileExists('tests')) {
-              sh "${env.PYTHON} -m pytest"
-            } else {
-              echo 'No backend tests configured; skipping.'
-            }
+        script {
+          if (fileExists('pytest.ini') || fileExists('tests')) {
+            bat "${env.PYTHON} -m pytest"
+          } else {
+            echo 'No backend tests configured; skipping.'
           }
         }
       }
@@ -67,7 +66,7 @@ pipeline {
       }
       steps {
         dir('frontend') {
-          sh "npm run build || echo 'No build script configured; skipping.'"
+          bat "npm run build || echo 'No build script configured; skipping.'"
         }
       }
     }
