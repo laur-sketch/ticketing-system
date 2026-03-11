@@ -1,30 +1,44 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { api } from '../../api/client'
+import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 
-const PRIORITIES = ['Low', 'Medium', 'High', 'Critical']
 const CATEGORIES = ['General', 'Bug', 'Feature Request', 'Support', 'Security', 'Performance', 'Documentation', 'Other']
 
 export default function CreateTicket() {
-  const navigate    = useNavigate()
+  const navigate     = useNavigate()
+  const { user }    = useAuth()
   const { addToast } = useToast()
-  const [form, setForm]         = useState({ title: '', description: '', priority: 'Medium', category: 'General', assigned_to_id: '' })
-  const [assignees, setAssignees] = useState([])
-  const [saving, setSaving]     = useState(false)
+  const [form, setForm]       = useState({ created_by_username: '', title: '', description: '', category: 'General' })
+  const [saving, setSaving]    = useState(false)
 
   useEffect(() => {
-    api.get('/utils/assignees').then(d => setAssignees(d.assignees)).catch(() => {})
-  }, [])
+    // Default creator to the logged-in user
+    if (user?.username) {
+      setForm(f => (f.created_by_username ? f : { ...f, created_by_username: user.username }))
+    }
+  }, [user?.username])
 
   const onChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }))
 
   const onSubmit = async e => {
     e.preventDefault()
+    if (user?.role === 'admin' && !(form.created_by_username || '').trim()) {
+      addToast('Username is required.', 'error')
+      return
+    }
     setSaving(true)
     try {
-      const body = { ...form, assigned_to_id: form.assigned_to_id ? parseInt(form.assigned_to_id) : null }
-      const d    = await api.post('/tickets', body)
+      const body = {
+        title: form.title,
+        description: form.description,
+        category: form.category,
+      }
+      if (user?.role === 'admin') {
+        body.created_by_username = (form.created_by_username || '').trim()
+      }
+      const d = await api.post('/tickets', body)
       addToast(`Ticket ${d.ticket.ticket_id} created successfully.`, 'success')
       navigate(`/tickets/${d.ticket.ticket_id}`)
     } catch (err) {
@@ -51,6 +65,19 @@ export default function CreateTicket() {
 
           <form onSubmit={onSubmit} className="p-6 space-y-5">
             <div>
+              <label className="label">Username <span className="text-red-500">*</span></label>
+              <input
+                name="created_by_username"
+                type="text"
+                required
+                value={form.created_by_username}
+                onChange={onChange}
+                readOnly={user?.role !== 'admin'}
+                className={`input ${user?.role !== 'admin' ? 'bg-slate-100 cursor-default' : ''}`}
+                autoComplete="off"
+              />
+            </div>
+            <div>
               <label className="label">Title <span className="text-red-500">*</span></label>
               <input name="title" type="text" required maxLength={200} value={form.title} onChange={onChange}
                 className="input" placeholder="Brief, descriptive title of the issue" />
@@ -64,29 +91,12 @@ export default function CreateTicket() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="label">Priority</label>
-                <select name="priority" value={form.priority} onChange={onChange} className="select">
-                  {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-                <p className="text-xs text-slate-400 mt-1">Select the urgency level</p>
-              </div>
-              <div>
                 <label className="label">Category</label>
                 <select name="category" value={form.category} onChange={onChange} className="select">
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
             </div>
-
-            {assignees.length > 0 && (
-              <div>
-                <label className="label">Assign to IT Personnel <span className="text-slate-400 font-normal">(optional)</span></label>
-                <select name="assigned_to_id" value={form.assigned_to_id} onChange={onChange} className="select">
-                  <option value="">— Unassigned —</option>
-                  {assignees.map(a => <option key={a.id} value={a.id}>{a.username} ({a.role_label})</option>)}
-                </select>
-              </div>
-            )}
 
             {/* Priority guide */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">

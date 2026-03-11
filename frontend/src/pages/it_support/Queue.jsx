@@ -64,11 +64,10 @@ export default function Queue() {
 
         {/* Table */}
         <div className="card">
-          <div className="card-header flex items-center justify-between">
+          <div className="card-header">
             <p className="text-sm text-slate-600">
               {loading ? 'Loading…' : <><span className="font-semibold text-slate-800">{data?.pagination?.total ?? 0}</span> ticket{data?.pagination?.total !== 1 ? 's' : ''} in queue</>}
             </p>
-            <Link to="/it-support/unassigned" className="text-xs font-medium text-orange-600 hover:text-orange-700">View unassigned →</Link>
           </div>
 
           {loading ? (
@@ -119,7 +118,9 @@ export default function Queue() {
               </div>
               <p className="text-slate-600 font-medium">Queue is clear!</p>
               <p className="text-slate-400 text-sm mt-1 mb-4">No active tickets assigned to you</p>
-              <Link to="/it-support/unassigned" className="inline-flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">View Unassigned Tickets</Link>
+              <Link to="/it-support/unassigned" className="inline-flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                View Unassigned Tickets
+              </Link>
             </div>
           )}
         </div>

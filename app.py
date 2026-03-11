@@ -540,15 +540,38 @@ def my_tickets():
 @app.route('/api/tickets', methods=['POST'])
 @login_required
 def create_ticket():
-    data        = request.get_json() or {}
-    title       = data.get('title', '').strip()
-    description = data.get('description', '').strip()
-    priority    = data.get('priority', 'Medium')
-    category    = data.get('category', 'General')
-    assigned_id = data.get('assigned_to_id') or None
+    data         = request.get_json() or {}
+    title        = data.get('title', '').strip()
+    description  = data.get('description', '').strip()
+    priority     = data.get('priority', 'Medium')
+    category     = data.get('category', 'General')
+    created_by_id = current_user.id
+
+    # Admin can create ticket on behalf of another user
+    if current_user.role == 'admin':
+        cb = data.get('created_by_id')
+        cu = (data.get('created_by_username') or '').strip()
+
+        if cb is not None and cb != '':
+            u = User.query.filter_by(id=int(cb), is_active_user=True).first()
+            if not u:
+                return jsonify({'error': 'Invalid user for ticket creator'}), 400
+            created_by_id = u.id
+        elif cu:
+            u = User.query.filter(
+                User.is_active_user == True,
+                User.username.ilike(cu)
+            ).first()
+            if not u:
+                return jsonify({'error': 'User not found for ticket creator'}), 400
+            created_by_id = u.id
 
     if not title or not description:
         return jsonify({'error': 'Title and description are required'}), 400
+
+    # Only admin can set priority on create; others get Medium
+    if current_user.role != 'admin':
+        priority = 'Medium'
 
     ticket = Ticket(
         ticket_id      = generate_ticket_id(),
@@ -556,21 +579,13 @@ def create_ticket():
         description    = description,
         priority       = priority,
         category       = category,
-        created_by_id  = current_user.id,
-        assigned_to_id = assigned_id,
+        created_by_id  = created_by_id,
+        assigned_to_id = None,  # Assignment only via Edit, admin only
     )
     db.session.add(ticket)
     db.session.flush()
     log_activity(ticket.id, 'Ticket created')
-    notifs = []
-    if assigned_id and assigned_id != current_user.id:
-        notifs.append(create_notification(
-            assigned_id, 'assigned', ticket,
-            f'{current_user.username} assigned ticket {ticket.ticket_id} ("{ticket.title}") to you.'
-        ))
     db.session.commit()
-    for n in notifs:
-        emit_notification(n)
     return jsonify({'ticket': serialize_ticket(ticket)}), 201
 
 @app.route('/api/tickets/<ticket_id>')
@@ -597,15 +612,17 @@ def update_ticket(ticket_id):
     data = request.get_json() or {}
     ticket.title       = data.get('title', ticket.title).strip()
     ticket.description = data.get('description', ticket.description).strip()
-    ticket.priority    = data.get('priority', ticket.priority)
     ticket.category    = data.get('category', ticket.category)
     ticket.updated_at  = datetime.utcnow()
 
-    if current_user.role in ('it_support', 'admin'):
-        new_status  = data.get('status', ticket.status)
-        assigned_id = data.get('assigned_to_id')
+    # Priority: Admin only
+    if current_user.role == 'admin':
+        ticket.priority = data.get('priority', ticket.priority)
 
-        notifs = []
+    notifs = []
+    # Status: IT Support and Admin can change
+    if current_user.role in ('it_support', 'admin'):
+        new_status = data.get('status', ticket.status)
         if new_status != ticket.status:
             log_activity(ticket.id, f'Status changed from "{ticket.status}" to "{new_status}"')
             if new_status == 'Closed':
@@ -621,7 +638,14 @@ def update_ticket(ticket_id):
                         f'{current_user.username} resolved ticket {ticket.ticket_id} ("{ticket.title}").'
                     ))
             ticket.status = new_status
+
+    # Assignment: Admin only; must set priority before assigning
+    if current_user.role == 'admin':
+        raw = data.get('assigned_to_id')
+        assigned_id = int(raw) if raw and str(raw).strip() else None
         if assigned_id != ticket.assigned_to_id:
+            if not (ticket.priority or '').strip():
+                return jsonify({'error': 'Set a priority level before assigning personnel'}), 400
             name = (db.session.get(User, assigned_id).username if assigned_id else 'Unassigned')
             log_activity(ticket.id, f'Assigned to {name}')
             if assigned_id and assigned_id != current_user.id:
@@ -629,7 +653,7 @@ def update_ticket(ticket_id):
                     assigned_id, 'assigned', ticket,
                     f'{current_user.username} assigned ticket {ticket.ticket_id} ("{ticket.title}") to you.'
                 ))
-            ticket.assigned_to_id = assigned_id or None
+            ticket.assigned_to_id = assigned_id
 
     db.session.commit()
     for n in notifs:
@@ -737,6 +761,7 @@ def restore_ticket(ticket_id):
     if not ticket.is_archived:
         return jsonify({'error': 'Ticket is not archived'}), 409
     ticket.is_archived = False
+    ticket.status      = 'Open'
     ticket.updated_at  = datetime.utcnow()
     log_activity(ticket.id, f'Ticket restored from archive by {current_user.username}')
     db.session.commit()

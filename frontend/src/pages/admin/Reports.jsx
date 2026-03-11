@@ -11,7 +11,7 @@ const PRIORITY_COLOR = {
   Low:      { bar: 'bg-blue-400', badge: 'bg-blue-100 text-blue-700' },
 }
 const STATUS_COLOR = {
-  'Open':          { bar: 'bg-blue-500', badge: 'bg-blue-100 text-blue-700' },
+  'Open':          { bar: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
   'In Progress':   { bar: 'bg-amber-400',   badge: 'bg-amber-100 text-amber-700'   },
   'Under Review':  { bar: 'bg-violet-400',  badge: 'bg-violet-100 text-violet-700' },
   'Resolved':      { bar: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },

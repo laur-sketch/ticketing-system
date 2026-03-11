@@ -92,12 +92,6 @@ export default function EditTicket() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
-                <label className="label">Priority</label>
-                <select name="priority" value={form.priority || ''} onChange={onChange} className="select">
-                  {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
-              <div>
                 <label className="label">Category</label>
                 <select name="category" value={form.category || ''} onChange={onChange} className="select">
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -106,20 +100,30 @@ export default function EditTicket() {
             </div>
 
             {isSupport && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-4 border-t border-slate-200">
+              <div className="pt-4 border-t border-slate-200">
+                <label className="label">
+                  Status <span className="text-xs text-blue-600 font-normal ml-1">(IT Support / Admin only)</span>
+                </label>
+                <select name="status" value={form.status || ''} onChange={onChange} className="select max-w-xs">
+                  {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            )}
+            {user?.role === 'admin' && (
+              <div className="pt-4 border-t border-slate-200 space-y-4">
                 <div>
                   <label className="label">
-                    Status <span className="text-xs text-blue-600 font-normal ml-1">(IT Support / Admin only)</span>
+                    Priority <span className="text-xs text-blue-600 font-normal ml-1">(Admin only — set before assigning)</span>
                   </label>
-                  <select name="status" value={form.status || ''} onChange={onChange} className="select">
-                    {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                  <select name="priority" value={form.priority || ''} onChange={onChange} className="select max-w-xs">
+                    {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="label">
-                    Assign to IT Personnel <span className="text-xs text-blue-600 font-normal ml-1">(IT Support / Admin only)</span>
+                    Assign to IT Personnel <span className="text-xs text-blue-600 font-normal ml-1">(Admin only)</span>
                   </label>
-                  <select name="assigned_to_id" value={form.assigned_to_id || ''} onChange={onChange} className="select">
+                  <select name="assigned_to_id" value={form.assigned_to_id || ''} onChange={onChange} className="select max-w-xs">
                     <option value="">— Unassigned —</option>
                     {assignees.map(a => <option key={a.id} value={a.id}>{a.username} ({a.role_label})</option>)}
                   </select>

@@ -65,9 +65,9 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard title="Total Tickets" value={s.total ?? 0} bg="bg-blue-100"
             icon={<svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>} />
-          <StatCard title="Open" value={s.open ?? 0} bg="bg-blue-100"
-            barColor="bg-blue-500" barPct={pct(s.open)}
-            icon={<svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>} />
+          <StatCard title="Open" value={s.open ?? 0} bg="bg-emerald-100"
+            barColor="bg-emerald-500" barPct={pct(s.open)}
+            icon={<svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>} />
           <StatCard title="In Progress" value={s.in_progress ?? 0} bg="bg-amber-100"
             barColor="bg-amber-500" barPct={pct(s.in_progress)}
             icon={<svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
@@ -77,7 +77,7 @@ export default function Dashboard() {
         </div>
 
         {/* Secondary row */}
-        <div className={`grid grid-cols-1 gap-4 ${isAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="bg-red-50 border border-red-100 rounded-xl p-5 flex items-center gap-4">
             <div className="w-11 h-11 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
               <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -93,14 +93,15 @@ export default function Dashboard() {
 
           <div className="bg-blue-100/50 border border-blue-200 rounded-xl p-5 flex items-center gap-4">
             <div className="w-11 h-11 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
               </svg>
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-700">{s.closed ?? 0}</p>
-              <p className="text-sm font-medium text-slate-600">Closed Tickets</p>
+              <p className="text-2xl font-bold text-blue-700">{s.archived ?? 0}</p>
+              <p className="text-sm font-medium text-blue-600">Archived</p>
             </div>
+            {s.archived > 0 && <Link to="/admin/archive" className="ml-auto text-xs text-blue-600 hover:text-blue-700 font-medium">View →</Link>}
           </div>
 
           {isSupport ? (
@@ -128,21 +129,6 @@ export default function Dashboard() {
                 <p className="text-sm font-medium text-blue-600">My Open Tickets</p>
               </div>
               {s.my_open > 0 && <Link to="/tickets/my" className="ml-auto text-xs text-blue-600 hover:text-blue-700 font-medium">View →</Link>}
-            </div>
-          )}
-
-          {isAdmin && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 flex items-center gap-4">
-              <div className="w-11 h-11 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-blue-700">{s.archived ?? 0}</p>
-                <p className="text-sm font-medium text-blue-600">Archived</p>
-              </div>
-              {s.archived > 0 && <Link to="/admin/archive" className="ml-auto text-xs text-blue-600 hover:text-blue-700 font-medium">View →</Link>}
             </div>
           )}
         </div>
