@@ -63,7 +63,7 @@ export default function CreateTicket() {
       if (screenshotFile) {
         const fd = new FormData()
         fd.append('file', screenshotFile)
-        await api.post(`/tickets/${d.ticket.ticket_id}/screenshot`, fd)
+        await api.postForm(`/tickets/${d.ticket.ticket_id}/screenshot`, fd)
       }
       addToast(`Ticket ${d.ticket.ticket_id} created successfully.`, 'success')
       navigate(`/tickets/${d.ticket.ticket_id}`)
