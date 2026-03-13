@@ -149,78 +149,23 @@ export default function Reports() {
   const getMonthLabel = () =>
     month ? (data?.available_months?.find(m => m.value === month)?.label ?? month) : 'All Time'
 
-  /** Export CSV: summary sections followed by full ticket records */
+  /** Export CSV: only Name, Department/Business Unit, Issue — Excel-friendly format */
   const exportCSV = () => {
     if (!data) return
-    const monthLabel   = getMonthLabel()
-    const generatedAt  = fmtDateTime(new Date().toISOString())
-    const resolvedTotal = (data.by_status?.find(s => s.status === 'Resolved')?.count ?? 0)
-                        + (data.by_status?.find(s => s.status === 'Closed')?.count ?? 0)
-
-    // Use a single-column approach so Excel opens it cleanly
+    const monthLabel = getMonthLabel()
     const e = v => `"${String(v ?? '').replace(/"/g, '""')}"`
-    const lines = []
-
-    const header = (txt) => { lines.push(''); lines.push(e(txt)); lines.push('') }
-    const row2   = (a, b)       => lines.push(`${e(a)},${e(b)}`)
-    const row3   = (a, b, c)    => lines.push(`${e(a)},${e(b)},${e(c)}`)
-    const row4   = (a, b, c, d) => lines.push(`${e(a)},${e(b)},${e(c)},${e(d)}`)
-
-    // ── cover ──────────────────────────────────────────────────────────────
-    lines.push(e('TICKETFLOW — TICKET REPORT'))
-    row2('Period',       monthLabel)
-    row2('Generated',   generatedAt)
-    row2('Total Tickets', data.total)
-    row2('Resolved + Closed', resolvedTotal)
-
-    // ── by status ──────────────────────────────────────────────────────────
-    header('BY STATUS')
-    row2('Status', 'Count')
-    data.by_status.forEach(r => row2(r.status, r.count))
-
-    // ── by category ───────────────────────────────────────────────────────
-    header('BY CATEGORY')
-    row2('Category', 'Count')
-    data.by_category.forEach(r => row2(r.category, r.count))
-
-    // ── by priority ───────────────────────────────────────────────────────
-    header('BY PRIORITY')
-    row2('Priority', 'Count')
-    data.by_priority.forEach(r => row2(r.priority, r.count))
-
-    // ── resolved by personnel ─────────────────────────────────────────────
-    header('RESOLVED BY PERSONNEL')
-    row3('Name', 'Role', 'Resolved Tickets')
-    data.by_personnel.forEach(r => row3(r.username, r.role_label, r.count))
-
-    // ── by period ─────────────────────────────────────────────────────────
-    header(`TICKETS ${period === 'week' ? 'PER WEEK' : 'PER MONTH'}`)
-    row2('Period', 'Count')
-    data.by_period.forEach(r => row2(r.label, r.count))
-
-    // ── ticket records ────────────────────────────────────────────────────
-    // Only export the Google Form-aligned fields
-    header('TICKET RECORDS')
-    lines.push(
-      [
-        'Email',
-        'Department / Business Unit',
-        'Name',
-        'Issue',
-      ].map(e).join(',')
-    )
-    data.tickets.forEach(t => {
-      lines.push(
+    const lines = [
+      ['Name', 'Department/Business Unit', 'Issue'].map(e).join(','),
+      ...data.tickets.map(t =>
         [
-          t.email ?? '',
-          t.department_business_unit ?? t.category ?? '',
           t.name ?? t.created_by ?? '',
+          t.department_business_unit ?? t.category ?? '',
           t.issue ?? t.title ?? '',
         ].map(e).join(',')
-      )
-    })
-
-    const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' })
+      ),
+    ]
+    const bom = '\uFEFF'
+    const blob = new Blob([bom + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href     = url
@@ -657,23 +602,19 @@ export default function Reports() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
-                      <th className="th text-left px-4 py-3">Email</th>
-                      <th className="th text-left px-4 py-3">Department / Business Unit</th>
                       <th className="th text-left px-4 py-3">Name</th>
+                      <th className="th text-left px-4 py-3">Department/Business Unit</th>
                       <th className="th text-left px-4 py-3">Issue</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {data.tickets.map(t => {
-                      return (
-                        <tr key={t.ticket_id} className="hover:bg-slate-50 transition-colors">
-                          <td className="td px-4 py-2.5 text-slate-700 text-xs">{t.email ?? '—'}</td>
-                          <td className="td px-4 py-2.5 text-slate-600 text-xs">{t.department_business_unit ?? t.category ?? '—'}</td>
-                          <td className="td px-4 py-2.5 text-slate-700 text-xs">{t.name ?? t.created_by ?? '—'}</td>
-                          <td className="td px-4 py-2.5 text-slate-800 max-w-xs truncate" title={t.issue ?? t.title}>{t.issue ?? t.title}</td>
-                        </tr>
-                      )
-                    })}
+                    {data.tickets.map(t => (
+                      <tr key={t.ticket_id} className="hover:bg-slate-50 transition-colors">
+                        <td className="td px-4 py-2.5 text-slate-700 text-xs">{t.name ?? t.created_by ?? '—'}</td>
+                        <td className="td px-4 py-2.5 text-slate-600 text-xs">{t.department_business_unit ?? t.category ?? '—'}</td>
+                        <td className="td px-4 py-2.5 text-slate-800 max-w-md truncate" title={t.issue ?? t.title}>{t.issue ?? t.title}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

@@ -661,6 +661,10 @@ def update_ticket(ticket_id):
     ticket.title       = data.get('title', ticket.title).strip()
     ticket.description = data.get('description', ticket.description).strip()
     ticket.category    = data.get('category', ticket.category)
+    if 'department_business_unit' in data:
+        ticket.department_business_unit = (data.get('department_business_unit') or '').strip() or None
+    if 'requester_name' in data:
+        ticket.requester_name = (data.get('requester_name') or '').strip() or None
     ticket.updated_at  = datetime.utcnow()
 
     # Priority: Admin only

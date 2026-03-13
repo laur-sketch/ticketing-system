@@ -305,6 +305,7 @@ export default function TicketDetail() {
                   { label: 'Status', val: <StatusBadge status={ticket.status} /> },
                   { label: 'Priority', val: <PriorityBadge priority={ticket.priority} /> },
                   { label: 'Category', val: <span className="text-slate-700">{ticket.category}</span> },
+                  { label: 'Department/Business Unit', val: <span className="text-slate-700">{ticket.department_business_unit || '—'}</span> },
                 ].map(({ label, val }) => (
                   <div key={label}>
                     <dt className="text-xs text-slate-400 mb-1">{label}</dt>

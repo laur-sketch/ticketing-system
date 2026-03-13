@@ -27,6 +27,8 @@ export default function EditTicket() {
     ]).then(([d, a]) => {
       setTicket(d.ticket)
       setForm({
+        requester_name: d.ticket.requester_name || d.ticket.created_by?.username || '',
+        department_business_unit: d.ticket.department_business_unit || '',
         title:          d.ticket.title,
         description:    d.ticket.description,
         priority:       d.ticket.priority,
@@ -81,6 +83,14 @@ export default function EditTicket() {
           </div>
 
           <form onSubmit={onSubmit} className="p-6 space-y-5">
+            <div>
+              <label className="label">Name <span className="text-red-500">*</span></label>
+              <input name="requester_name" type="text" required value={form.requester_name || ''} onChange={onChange} className="input" placeholder="Submitter name" />
+            </div>
+            <div>
+              <label className="label">Department/Business Unit <span className="text-red-500">*</span></label>
+              <input name="department_business_unit" type="text" required value={form.department_business_unit || ''} onChange={onChange} className="input" placeholder="e.g. Finance, HR, IT" />
+            </div>
             <div>
               <label className="label">Title <span className="text-red-500">*</span></label>
               <input name="title" type="text" required maxLength={200} value={form.title || ''} onChange={onChange} className="input" />
