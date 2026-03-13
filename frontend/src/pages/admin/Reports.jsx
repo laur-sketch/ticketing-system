@@ -120,12 +120,13 @@ function ChartCard({ title, sub, children }) {
 // ── main page ─────────────────────────────────────────────────────────────────
 export default function Reports() {
   const { fmtDateTime } = useTimeFormat()
-  const toast = useToast()
+  const { addToast } = useToast()
   const fileInputRef = useRef(null)
   const [period,  setPeriod]  = useState('month')     // 'week' | 'month'
   const [month,   setMonth]   = useState('')           // 'YYYY-MM' or ''
   const [data,    setData]    = useState(null)
   const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -174,27 +175,39 @@ export default function Reports() {
     URL.revokeObjectURL(url)
   }
 
-  /** Import CSV: open file picker; on select, read and parse CSV then reload report data if backend supports it */
+  /** Import CSV: open file picker; on select, send to backend to create tickets, then reload */
   const triggerImportCSV = () => {
     if (fileInputRef.current) fileInputRef.current.click()
   }
-  const handleImportCSV = (e) => {
+  const handleImportCSV = async (e) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      try {
-        const text = reader.result
-        const lines = text.split(/\r?\n/).filter(Boolean)
-        const rows = lines.length < 2 ? 0 : lines.length - 1
-        toast.success(rows ? `CSV loaded: ${rows} data row(s).` : 'CSV file is empty.')
-      } catch (err) {
-        toast.error('Could not read CSV.')
+    setImporting(true)
+    try {
+      const text = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = () => reject(new Error('Could not read file.'))
+        reader.readAsText(file, 'UTF-8')
+      })
+      const res = await api.post('/reports/import', { csv: text })
+      const { imported, errors } = res
+      if (imported > 0) {
+        load()
+        addToast(`${imported} ticket(s) imported successfully.`, 'success')
       }
+      if (errors?.length) {
+        addToast(errors[0] + (errors.length > 1 ? ` (and ${errors.length - 1} more)` : ''), 'error')
+      }
+      if (imported === 0 && !errors?.length) {
+        addToast('No rows to import. CSV must have header: Name, Department/Business Unit, Issue', 'info')
+      }
+    } catch (err) {
+      addToast(err.message || 'Import failed.', 'error')
+    } finally {
+      setImporting(false)
     }
-    reader.onerror = () => toast.error('Could not read file.')
-    reader.readAsText(file, 'UTF-8')
   }
 
   /** Export Summary: open a print-ready HTML page → user saves as PDF */
@@ -274,7 +287,7 @@ export default function Reports() {
 
 <div class="cards">
   <div class="card"><div class="card-label">Total Tickets</div><div class="card-val">${data.total}</div></div>
-  <div class="card"><div class="card-label">Resolved + Closed</div><div class="card-val">${resolvedTotal}</div></div>
+  <div class="card"><div class="card-label">Resolved + Archived</div><div class="card-val">${resolvedTotal}</div></div>
   <div class="card"><div class="card-label">Top Category</div><div class="card-val" style="font-size:18px">${data.by_category[0]?.category ?? '—'}</div><div class="meta">${data.by_category[0]?.count ?? 0} tickets</div></div>
   <div class="card"><div class="card-label">Top Resolver</div><div class="card-val" style="font-size:18px">${data.by_personnel[0]?.username ?? '—'}</div><div class="meta">${data.by_personnel[0]?.count ?? 0} resolved</div></div>
 </div>
@@ -392,14 +405,15 @@ export default function Reports() {
             <button
               type="button"
               onClick={triggerImportCSV}
-              title="Select a CSV file to import"
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg shadow-sm hover:bg-emerald-100 hover:border-emerald-300 transition-colors"
+              disabled={importing}
+              title="Select a CSV file to import (Name, Department/Business Unit, Issue)"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg shadow-sm hover:bg-emerald-100 hover:border-emerald-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
               </svg>
-              Import CSV
+              {importing ? 'Importing…' : 'Import CSV'}
             </button>
             <button
               onClick={exportPDF}
@@ -440,7 +454,7 @@ export default function Reports() {
             {/* ── summary cards ──────────────────────────────────────────── */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard color="blue"   label="Total Tickets"         value={data.total} />
-              <StatCard color="green"  label="Resolved + Closed"     value={resolvedCount + closedCount} />
+              <StatCard color="green"  label="Resolved + Archived"   value={resolvedCount + closedCount} />
               <StatCard color="blue"  label="Top Category"          value={topCategory?.count ?? 0}   sub={topCategory?.category} />
               <StatCard color="violet" label="Top Resolver"          value={topPersonnel?.count ?? 0}  sub={topPersonnel?.username} />
             </div>
@@ -517,7 +531,7 @@ export default function Reports() {
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
                 <div>
                   <h2 className="text-sm font-bold text-slate-800">Resolved Tickets by Assigned Personnel</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Counts Resolved &amp; Closed tickets per assignee</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Counts Resolved &amp; Archived tickets per assignee</p>
                 </div>
                 <span className="text-xs text-slate-500">{data.by_personnel.length} personnel</span>
               </div>

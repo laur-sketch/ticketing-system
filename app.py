@@ -8,6 +8,8 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 from functools import wraps
 import os
+import csv
+import io
 from dotenv import load_dotenv
 
 load_dotenv()   # loads DATABASE_URL (and other vars) from .env when present
@@ -1045,7 +1047,7 @@ def get_ticket_report():
             'email':       t.creator.email if t.creator else '',
             'department_business_unit': (t.department_business_unit or '').strip() or t.category,
             'name':        (t.requester_name or (t.creator.username if t.creator else '')),
-            'issue':       f"{t.title}\n\n{t.description}".strip(),
+            'issue':       (t.description or '').strip(),
             'screenshot':  (f"/uploads/{t.screenshot_filename}" if t.screenshot_filename else ''),
             'status':      t.status,
             'category':    t.category,
@@ -1075,6 +1077,60 @@ def get_ticket_report():
 @admin_required
 def get_resolved_report():
     return get_ticket_report()
+
+
+@app.route('/api/reports/import', methods=['POST'])
+@login_required
+@admin_required
+def import_tickets_csv():
+    """Import tickets from CSV. Expects JSON body: { csv: "raw csv text" }.
+    CSV format: Name, Department/Business Unit, Issue (header row required)."""
+    data = request.get_json() or {}
+    raw = data.get('csv', '')
+    if not raw or not raw.strip():
+        return jsonify({'error': 'CSV content is required'}), 400
+
+    raw = raw.strip()
+    if raw.startswith('\ufeff'):
+        raw = raw[1:]
+    reader = csv.DictReader(io.StringIO(raw))
+    created = 0
+    errors = []
+    def col(row, *keys):
+        for k in keys:
+            for h, v in (row or {}).items():
+                if h and h.strip().lstrip('\ufeff').lower() == k.lower():
+                    return (v or '').strip()
+        return ''
+    for i, row in enumerate(reader, start=2):
+        name = col(row, 'Name', 'name')
+        dept = col(row, 'Department/Business Unit', 'Department / Business Unit', 'Department', 'department_business_unit', 'Departme')
+        issue = col(row, 'Issue', 'issue')
+        if not name or not dept or not issue:
+            errors.append(f'Row {i}: missing Name, Department/Business Unit, or Issue')
+            continue
+        first_line = issue.split('\n')[0].strip() or 'Imported Issue'
+        title = first_line[:200] if len(first_line) > 200 else first_line
+        ticket = Ticket(
+            ticket_id=generate_ticket_id(),
+            title=title,
+            description=issue,
+            requester_name=name,
+            department_business_unit=dept,
+            priority='Medium',
+            category='General',
+            created_by_id=current_user.id,
+            assigned_to_id=None,
+        )
+        db.session.add(ticket)
+        db.session.flush()
+        log_activity(ticket.id, 'Ticket created (CSV import)')
+        created += 1
+    db.session.commit()
+    return jsonify({
+        'imported': created,
+        'errors': errors[:10] if errors else [],
+    })
 
 
 # ── Socket.IO Events ──────────────────────────────────────────────────────────
