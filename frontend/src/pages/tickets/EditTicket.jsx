@@ -94,6 +94,7 @@ export default function EditTicket() {
               <div>
                 <label className="label">Category</label>
                 <select name="category" value={form.category || ''} onChange={onChange} className="select">
+                  {!form.category && <option value="">Set Category</option>}
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
@@ -116,6 +117,7 @@ export default function EditTicket() {
                     Priority <span className="text-xs text-blue-600 font-normal ml-1">(Admin only — set before assigning)</span>
                   </label>
                   <select name="priority" value={form.priority || ''} onChange={onChange} className="select max-w-xs">
+                    {!form.priority && <option value="">Set Priority Level</option>}
                     {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>

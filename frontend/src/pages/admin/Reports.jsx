@@ -199,11 +199,16 @@ export default function Reports() {
     data.by_period.forEach(r => row2(r.label, r.count))
 
     // ── ticket records ────────────────────────────────────────────────────
+    // Only export the Google Form-aligned fields
     header('TICKET RECORDS')
-    // Match Google Form field naming
-    row4('Email', 'Department / Business Unit', 'Name', 'Issue')
-    lines[lines.length - 1] =
-      `${e('Email')},${e('Department / Business Unit')},${e('Name')},${e('Issue')},${e('Insert Screenshot')},${e('Status')},${e('Priority')},${e('Assigned To')},${e('Created At')},${e('Archived')},${e('Ticket ID')}`
+    lines.push(
+      [
+        'Email',
+        'Department / Business Unit',
+        'Name',
+        'Issue',
+      ].map(e).join(',')
+    )
     data.tickets.forEach(t => {
       lines.push(
         [
@@ -211,13 +216,6 @@ export default function Reports() {
           t.department_business_unit ?? t.category ?? '',
           t.name ?? t.created_by ?? '',
           t.issue ?? t.title ?? '',
-          t.screenshot ?? '',
-          t.status,
-          t.priority,
-          t.assigned_to,
-          fmtDateTime(t.created_at),
-          t.is_archived ? 'Yes' : 'No',
-          t.ticket_id,
         ].map(e).join(',')
       )
     })
@@ -663,43 +661,16 @@ export default function Reports() {
                       <th className="th text-left px-4 py-3">Department / Business Unit</th>
                       <th className="th text-left px-4 py-3">Name</th>
                       <th className="th text-left px-4 py-3">Issue</th>
-                      <th className="th text-left px-4 py-3">Insert Screenshot</th>
-                      <th className="th text-left px-4 py-3">Status</th>
-                      <th className="th text-left px-4 py-3">Priority</th>
-                      <th className="th text-left px-4 py-3">Assigned To</th>
-                      <th className="th text-left px-4 py-3">Created At</th>
-                      <th className="th text-left px-4 py-3">Archived</th>
-                      <th className="th text-left px-4 py-3">Ticket ID</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {data.tickets.map(t => {
-                      const pc = PRIORITY_COLOR[t.priority] ?? { badge: 'bg-slate-100 text-slate-700' }
-                      const sc = STATUS_COLOR[t.status]    ?? { badge: 'bg-slate-100 text-slate-600' }
                       return (
-                        <tr key={t.ticket_id} className={`hover:bg-slate-50 transition-colors ${t.is_archived ? 'bg-blue-50/40' : ''}`}>
+                        <tr key={t.ticket_id} className="hover:bg-slate-50 transition-colors">
                           <td className="td px-4 py-2.5 text-slate-700 text-xs">{t.email ?? '—'}</td>
                           <td className="td px-4 py-2.5 text-slate-600 text-xs">{t.department_business_unit ?? t.category ?? '—'}</td>
                           <td className="td px-4 py-2.5 text-slate-700 text-xs">{t.name ?? t.created_by ?? '—'}</td>
                           <td className="td px-4 py-2.5 text-slate-800 max-w-xs truncate" title={t.issue ?? t.title}>{t.issue ?? t.title}</td>
-                          <td className="td px-4 py-2.5 text-slate-300 text-xs">—</td>
-                          <td className="td px-4 py-2.5">
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sc.badge}`}>{t.status}</span>
-                          </td>
-                          <td className="td px-4 py-2.5">
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${pc.badge}`}>{t.priority}</span>
-                          </td>
-                          <td className="td px-4 py-2.5 text-slate-700 text-xs">{t.assigned_to}</td>
-                          <td className="td px-4 py-2.5 text-slate-500 text-xs tabular-nums whitespace-nowrap">
-                            {fmtDateTime(t.created_at)}
-                          </td>
-                          <td className="td px-4 py-2.5">
-                            {t.is_archived
-                              ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Archived</span>
-                              : <span className="text-xs text-slate-300">—</span>
-                            }
-                          </td>
-                          <td className="td px-4 py-2.5 font-mono text-xs text-blue-600 font-semibold">{t.ticket_id}</td>
                         </tr>
                       )
                     })}

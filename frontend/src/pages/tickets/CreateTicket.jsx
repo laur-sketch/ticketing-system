@@ -11,11 +11,10 @@ export default function CreateTicket() {
   const { user }    = useAuth()
   const { addToast } = useToast()
   const [form, setForm]       = useState({
-    created_by_username: '',
+    name: '',
     department_business_unit: '',
-    title: '',
-    description: '',
-    category: 'General',
+    issue: '',
+    category: '',
   })
   const [screenshotFile, setScreenshotFile] = useState(null)
   const [saving, setSaving]    = useState(false)
@@ -23,7 +22,7 @@ export default function CreateTicket() {
   useEffect(() => {
     // Default creator to the logged-in user
     if (user?.username) {
-      setForm(f => (f.created_by_username ? f : { ...f, created_by_username: user.username }))
+      setForm(f => (f.name ? f : { ...f, name: user.username }))
     }
   }, [user?.username])
 
@@ -31,24 +30,34 @@ export default function CreateTicket() {
 
   const onSubmit = async e => {
     e.preventDefault()
-    if (user?.role === 'admin' && !(form.created_by_username || '').trim()) {
-      addToast('Username is required.', 'error')
+    if (!(form.name || '').trim()) {
+      addToast('Name is required.', 'error')
       return
     }
     if (!(form.department_business_unit || '').trim()) {
       addToast('Department / Business Unit is required.', 'error')
       return
     }
+    if (!(form.category || '').trim()) {
+      addToast('Category is required.', 'error')
+      return
+    }
+    if (!(form.issue || '').trim()) {
+      addToast('Issue is required.', 'error')
+      return
+    }
     setSaving(true)
     try {
+      const issue = (form.issue || '').trim()
+      const firstLine = issue.split(/\r?\n/).map(s => s.trim()).find(Boolean) || 'Issue'
+      const title = firstLine.length > 200 ? `${firstLine.slice(0, 197)}...` : firstLine
+
       const body = {
-        title: form.title,
-        description: form.description,
-        category: form.category,
+        title,
+        description: issue,
+        category: (form.category || '').trim(),
         department_business_unit: (form.department_business_unit || '').trim(),
-      }
-      if (user?.role === 'admin') {
-        body.created_by_username = (form.created_by_username || '').trim()
+        requester_name: (form.name || '').trim(),
       }
       const d = await api.post('/tickets', body)
       if (screenshotFile) {
@@ -82,15 +91,14 @@ export default function CreateTicket() {
 
           <form onSubmit={onSubmit} className="p-6 space-y-5">
             <div>
-              <label className="label">Username <span className="text-red-500">*</span></label>
+              <label className="label">Name <span className="text-red-500">*</span></label>
               <input
-                name="created_by_username"
+                name="name"
                 type="text"
                 required
-                value={form.created_by_username}
+                value={form.name}
                 onChange={onChange}
-                readOnly={user?.role !== 'admin'}
-                className={`input ${user?.role !== 'admin' ? 'bg-slate-100 cursor-default' : ''}`}
+                className="input"
                 autoComplete="off"
               />
             </div>
@@ -107,24 +115,16 @@ export default function CreateTicket() {
               />
             </div>
             <div>
-              <label className="label">Title <span className="text-red-500">*</span></label>
-              <input name="title" type="text" required maxLength={200} value={form.title} onChange={onChange}
-                className="input" placeholder="Brief, descriptive title of the issue" />
-            </div>
-            <div>
-              <label className="label">Description <span className="text-red-500">*</span></label>
-              <textarea name="description" required rows={6} value={form.description} onChange={onChange}
+              <label className="label">Issue <span className="text-red-500">*</span></label>
+              <textarea
+                name="issue"
+                required
+                rows={8}
+                value={form.issue}
+                onChange={onChange}
                 className="input resize-none"
-                placeholder="Describe the issue in detail. Include steps to reproduce, expected behavior, and actual behavior…" />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div>
-                <label className="label">Category</label>
-                <select name="category" value={form.category} onChange={onChange} className="select">
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
+                placeholder="Type the issue here (you can include both the title and details). The first line will be used as the ticket title."
+              />
             </div>
 
             <div>
@@ -136,6 +136,16 @@ export default function CreateTicket() {
                 className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-800 hover:file:bg-blue-100"
               />
               <p className="text-xs text-slate-400 mt-1">Optional. PNG/JPG/WEBP/GIF.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label className="label">Category</label>
+                <select name="category" value={form.category} onChange={onChange} className="select">
+                  <option value="">Set Category</option>
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
             </div>
 
             {/* Priority guide */}

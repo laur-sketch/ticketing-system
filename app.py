@@ -101,6 +101,7 @@ class Ticket(db.Model):
     ticket_id       = db.Column(db.String(20), unique=True, nullable=False)
     title           = db.Column(db.String(200), nullable=False)
     description     = db.Column(db.Text, nullable=False)
+    requester_name  = db.Column(db.String(120), nullable=True)
     status          = db.Column(db.String(20), default='Open')
     priority        = db.Column(db.String(20), default='Medium')
     category        = db.Column(db.String(50), default='General')
@@ -257,6 +258,7 @@ def serialize_ticket(ticket):
         'ticket_id':      ticket.ticket_id,
         'title':          ticket.title,
         'description':    ticket.description,
+        'requester_name': ticket.requester_name,
         'status':         ticket.status,
         'priority':       ticket.priority,
         'category':       ticket.category,
@@ -555,34 +557,28 @@ def create_ticket():
     data         = request.get_json() or {}
     title        = data.get('title', '').strip()
     description  = data.get('description', '').strip()
+    requester_name = (data.get('requester_name') or '').strip()
     priority     = data.get('priority', 'Medium')
     category     = data.get('category', 'General')
     department_business_unit = (data.get('department_business_unit') or '').strip()
     created_by_id = current_user.id
 
-    # Admin can create ticket on behalf of another user
+    # Admin can create ticket on behalf of another user (by ID only)
     if current_user.role == 'admin':
         cb = data.get('created_by_id')
-        cu = (data.get('created_by_username') or '').strip()
 
         if cb is not None and cb != '':
             u = User.query.filter_by(id=int(cb), is_active_user=True).first()
             if not u:
                 return jsonify({'error': 'Invalid user for ticket creator'}), 400
             created_by_id = u.id
-        elif cu:
-            u = User.query.filter(
-                User.is_active_user == True,
-                User.username.ilike(cu)
-            ).first()
-            if not u:
-                return jsonify({'error': 'User not found for ticket creator'}), 400
-            created_by_id = u.id
 
     if not title or not description:
         return jsonify({'error': 'Title and description are required'}), 400
     if not department_business_unit:
         return jsonify({'error': 'Department / Business Unit is required'}), 400
+    if not requester_name:
+        requester_name = current_user.username
 
     # Only admin can set priority on create; others get Medium
     if current_user.role != 'admin':
@@ -592,6 +588,7 @@ def create_ticket():
         ticket_id      = generate_ticket_id(),
         title          = title,
         description    = description,
+        requester_name = requester_name,
         priority       = priority,
         category       = category,
         department_business_unit = department_business_unit,
@@ -1043,8 +1040,8 @@ def get_ticket_report():
             # Google Form-aligned fields (non-breaking additions)
             'email':       t.creator.email if t.creator else '',
             'department_business_unit': (t.department_business_unit or '').strip() or t.category,
-            'name':        t.creator.username if t.creator else '',
-            'issue':       t.description,
+            'name':        (t.requester_name or (t.creator.username if t.creator else '')),
+            'issue':       f"{t.title}\n\n{t.description}".strip(),
             'screenshot':  (f"/uploads/{t.screenshot_filename}" if t.screenshot_filename else ''),
             'status':      t.status,
             'category':    t.category,
@@ -1515,6 +1512,7 @@ with app.app_context():
     migrations = [
         ('tickets',       'is_deleted',  'BOOLEAN NOT NULL DEFAULT FALSE'),
         ('tickets',       'is_archived', 'BOOLEAN NOT NULL DEFAULT FALSE'),
+        ('tickets',       'requester_name', "VARCHAR(120)"),
         ('tickets',       'department_business_unit', "VARCHAR(120)"),
         ('tickets',       'screenshot_filename', "VARCHAR(255)"),
         ('chat_messages', 'is_system',   'BOOLEAN NOT NULL DEFAULT FALSE'),

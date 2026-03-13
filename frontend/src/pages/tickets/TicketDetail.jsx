@@ -314,8 +314,23 @@ export default function TicketDetail() {
                 <div className="pt-1 border-t border-slate-100">
                   <dt className="text-xs text-slate-400 mb-1">Submitted By</dt>
                   <dd className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold">{ticket.created_by?.initials}</span>
-                    <span className="text-slate-700 font-medium">{ticket.created_by?.username}</span>
+                    {(() => {
+                      const name = ticket.requester_name || ticket.created_by?.username || ''
+                      const initials = name
+                        .split(' ')
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map(part => part[0]?.toUpperCase() || '')
+                        .join('') || '??'
+                      return (
+                        <>
+                          <span className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold">
+                            {initials}
+                          </span>
+                          <span className="text-slate-700 font-medium">{name}</span>
+                        </>
+                      )
+                    })()}
                   </dd>
                 </div>
                 <div>
