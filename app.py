@@ -1,9 +1,10 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from datetime import datetime
 from functools import wraps
 import os
@@ -23,6 +24,9 @@ def _db_url():
     # Some platforms (Heroku) still emit 'postgres://' — SQLAlchemy 2.x requires 'postgresql://'
     if url.startswith('postgres://'):
         url = url.replace('postgres://', 'postgresql://', 1)
+    # Prefer psycopg (v3) driver to avoid psycopg2 build issues on Windows
+    if url.startswith('postgresql://'):
+        url = url.replace('postgresql://', 'postgresql+psycopg://', 1)
     return url
 
 app = Flask(__name__)
@@ -32,6 +36,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SESSION_COOKIE_SAMESITE']    = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY']    = True
 app.config['SESSION_COOKIE_SECURE']      = False   # True in production with HTTPS
+
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.config['UPLOAD_DIR'] = UPLOAD_DIR
 
 CORS(app, supports_credentials=True, origins=['http://localhost:5173'])
 
@@ -96,6 +104,8 @@ class Ticket(db.Model):
     status          = db.Column(db.String(20), default='Open')
     priority        = db.Column(db.String(20), default='Medium')
     category        = db.Column(db.String(50), default='General')
+    department_business_unit = db.Column(db.String(120), nullable=True)
+    screenshot_filename      = db.Column(db.String(255), nullable=True)
     created_by_id   = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     assigned_to_id  = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_at      = db.Column(db.DateTime, default=datetime.utcnow)
@@ -250,6 +260,8 @@ def serialize_ticket(ticket):
         'status':         ticket.status,
         'priority':       ticket.priority,
         'category':       ticket.category,
+        'department_business_unit': ticket.department_business_unit,
+        'screenshot_url': (f"/uploads/{ticket.screenshot_filename}" if ticket.screenshot_filename else None),
         'status_color':   status_color,
         'priority_color': priority_color,
         'created_by':     serialize_user(ticket.creator),
@@ -545,6 +557,7 @@ def create_ticket():
     description  = data.get('description', '').strip()
     priority     = data.get('priority', 'Medium')
     category     = data.get('category', 'General')
+    department_business_unit = (data.get('department_business_unit') or '').strip()
     created_by_id = current_user.id
 
     # Admin can create ticket on behalf of another user
@@ -568,6 +581,8 @@ def create_ticket():
 
     if not title or not description:
         return jsonify({'error': 'Title and description are required'}), 400
+    if not department_business_unit:
+        return jsonify({'error': 'Department / Business Unit is required'}), 400
 
     # Only admin can set priority on create; others get Medium
     if current_user.role != 'admin':
@@ -579,6 +594,7 @@ def create_ticket():
         description    = description,
         priority       = priority,
         category       = category,
+        department_business_unit = department_business_unit,
         created_by_id  = created_by_id,
         assigned_to_id = None,  # Assignment only via Edit, admin only
     )
@@ -597,6 +613,41 @@ def get_ticket(ticket_id):
                 ActivityLog.query.filter_by(ticket_id=ticket.id)
                 .order_by(ActivityLog.created_at.desc()).all()]
     return jsonify({'ticket': serialize_ticket(ticket), 'comments': comments, 'logs': logs})
+
+
+@app.route('/uploads/<path:filename>')
+@login_required
+def serve_upload(filename):
+    # Basic auth gate: only logged-in users can access uploads
+    return send_from_directory(app.config['UPLOAD_DIR'], filename, as_attachment=False)
+
+
+@app.route('/api/tickets/<ticket_id>/screenshot', methods=['POST'])
+@login_required
+def upload_ticket_screenshot(ticket_id):
+    ticket = Ticket.query.filter_by(ticket_id=ticket_id, is_deleted=False).first_or_404()
+
+    # Only the creator or admin can attach a screenshot
+    if current_user.role != 'admin' and current_user.id != ticket.created_by_id:
+        return jsonify({'error': 'Permission denied'}), 403
+
+    f = request.files.get('file')
+    if not f:
+        return jsonify({'error': 'File is required'}), 400
+
+    name = secure_filename(f.filename or '')
+    if not name.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif')):
+        return jsonify({'error': 'Only image files are allowed'}), 400
+
+    stamp = datetime.utcnow().strftime('%Y%m%d%H%M%S%f')
+    stored = f"{ticket.ticket_id}_{stamp}_{name}"
+    path = os.path.join(app.config['UPLOAD_DIR'], stored)
+    f.save(path)
+
+    ticket.screenshot_filename = stored
+    ticket.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({'ticket': serialize_ticket(ticket)})
 
 @app.route('/api/tickets/<ticket_id>', methods=['PUT'])
 @login_required
@@ -989,6 +1040,12 @@ def get_ticket_report():
         rows.append({
             'ticket_id':   t.ticket_id,
             'title':       t.title,
+            # Google Form-aligned fields (non-breaking additions)
+            'email':       t.creator.email if t.creator else '',
+            'department_business_unit': (t.department_business_unit or '').strip() or t.category,
+            'name':        t.creator.username if t.creator else '',
+            'issue':       t.description,
+            'screenshot':  (f"/uploads/{t.screenshot_filename}" if t.screenshot_filename else ''),
             'status':      t.status,
             'category':    t.category,
             'priority':    t.priority,
@@ -1455,17 +1512,28 @@ def get_choices():
 with app.app_context():
     db.create_all()
     # Safely add columns that may not exist on older databases.
-    # PostgreSQL supports ADD COLUMN IF NOT EXISTS (v9.6+) so no try/except needed.
     migrations = [
         ('tickets',       'is_deleted',  'BOOLEAN NOT NULL DEFAULT FALSE'),
         ('tickets',       'is_archived', 'BOOLEAN NOT NULL DEFAULT FALSE'),
+        ('tickets',       'department_business_unit', "VARCHAR(120)"),
+        ('tickets',       'screenshot_filename', "VARCHAR(255)"),
         ('chat_messages', 'is_system',   'BOOLEAN NOT NULL DEFAULT FALSE'),
     ]
     with db.engine.connect() as conn:
+        dialect = db.engine.dialect.name
         for table, col, typedef in migrations:
-            conn.execute(db.text(
-                f'ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {typedef}'
-            ))
+            if dialect == 'postgresql':
+                conn.execute(db.text(
+                    f'ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {typedef}'
+                ))
+            else:
+                # SQLite doesn't support IF NOT EXISTS for ADD COLUMN in many versions.
+                try:
+                    conn.execute(db.text(
+                        f'ALTER TABLE {table} ADD COLUMN {col} {typedef}'
+                    ))
+                except Exception:
+                    pass
         conn.commit()
 
 if __name__ == '__main__':

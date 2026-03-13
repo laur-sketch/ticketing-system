@@ -10,7 +10,14 @@ export default function CreateTicket() {
   const navigate     = useNavigate()
   const { user }    = useAuth()
   const { addToast } = useToast()
-  const [form, setForm]       = useState({ created_by_username: '', title: '', description: '', category: 'General' })
+  const [form, setForm]       = useState({
+    created_by_username: '',
+    department_business_unit: '',
+    title: '',
+    description: '',
+    category: 'General',
+  })
+  const [screenshotFile, setScreenshotFile] = useState(null)
   const [saving, setSaving]    = useState(false)
 
   useEffect(() => {
@@ -28,17 +35,27 @@ export default function CreateTicket() {
       addToast('Username is required.', 'error')
       return
     }
+    if (!(form.department_business_unit || '').trim()) {
+      addToast('Department / Business Unit is required.', 'error')
+      return
+    }
     setSaving(true)
     try {
       const body = {
         title: form.title,
         description: form.description,
         category: form.category,
+        department_business_unit: (form.department_business_unit || '').trim(),
       }
       if (user?.role === 'admin') {
         body.created_by_username = (form.created_by_username || '').trim()
       }
       const d = await api.post('/tickets', body)
+      if (screenshotFile) {
+        const fd = new FormData()
+        fd.append('file', screenshotFile)
+        await api.post(`/tickets/${d.ticket.ticket_id}/screenshot`, fd)
+      }
       addToast(`Ticket ${d.ticket.ticket_id} created successfully.`, 'success')
       navigate(`/tickets/${d.ticket.ticket_id}`)
     } catch (err) {
@@ -78,6 +95,18 @@ export default function CreateTicket() {
               />
             </div>
             <div>
+              <label className="label">Department / Business Unit <span className="text-red-500">*</span></label>
+              <input
+                name="department_business_unit"
+                type="text"
+                required
+                value={form.department_business_unit}
+                onChange={onChange}
+                className="input"
+                placeholder="e.g. Finance, HR, Operations"
+              />
+            </div>
+            <div>
               <label className="label">Title <span className="text-red-500">*</span></label>
               <input name="title" type="text" required maxLength={200} value={form.title} onChange={onChange}
                 className="input" placeholder="Brief, descriptive title of the issue" />
@@ -96,6 +125,17 @@ export default function CreateTicket() {
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
+            </div>
+
+            <div>
+              <label className="label">Insert Screenshot</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setScreenshotFile(e.target.files?.[0] ?? null)}
+                className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-800 hover:file:bg-blue-100"
+              />
+              <p className="text-xs text-slate-400 mt-1">Optional. PNG/JPG/WEBP/GIF.</p>
             </div>
 
             {/* Priority guide */}

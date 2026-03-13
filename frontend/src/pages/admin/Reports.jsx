@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../../api/client'
 import { useTimeFormat } from '../../context/TimeFormatContext'
+import { useToast } from '../../context/ToastContext'
 import Spinner from '../../components/Spinner'
 
 // ── colour maps ──────────────────────────────────────────────────────────────
@@ -119,6 +120,8 @@ function ChartCard({ title, sub, children }) {
 // ── main page ─────────────────────────────────────────────────────────────────
 export default function Reports() {
   const { fmtDateTime } = useTimeFormat()
+  const toast = useToast()
+  const fileInputRef = useRef(null)
   const [period,  setPeriod]  = useState('month')     // 'week' | 'month'
   const [month,   setMonth]   = useState('')           // 'YYYY-MM' or ''
   const [data,    setData]    = useState(null)
@@ -197,14 +200,24 @@ export default function Reports() {
 
     // ── ticket records ────────────────────────────────────────────────────
     header('TICKET RECORDS')
-    row4('Ticket ID', 'Title', 'Status', 'Category') // first half of columns
-    lines[lines.length - 1] =   // extend the last line
-      `${e('Ticket ID')},${e('Title')},${e('Status')},${e('Category')},${e('Priority')},${e('Assigned To')},${e('Created By')},${e('Created At')},${e('Last Updated')},${e('Archived')}`
+    // Match Google Form field naming
+    row4('Email', 'Department / Business Unit', 'Name', 'Issue')
+    lines[lines.length - 1] =
+      `${e('Email')},${e('Department / Business Unit')},${e('Name')},${e('Issue')},${e('Insert Screenshot')},${e('Status')},${e('Priority')},${e('Assigned To')},${e('Created At')},${e('Archived')},${e('Ticket ID')}`
     data.tickets.forEach(t => {
       lines.push(
-        [t.ticket_id, t.title, t.status, t.category, t.priority,
-         t.assigned_to, t.created_by, fmtDateTime(t.created_at),
-         fmtDateTime(t.updated_at), t.is_archived ? 'Yes' : 'No'
+        [
+          t.email ?? '',
+          t.department_business_unit ?? t.category ?? '',
+          t.name ?? t.created_by ?? '',
+          t.issue ?? t.title ?? '',
+          t.screenshot ?? '',
+          t.status,
+          t.priority,
+          t.assigned_to,
+          fmtDateTime(t.created_at),
+          t.is_archived ? 'Yes' : 'No',
+          t.ticket_id,
         ].map(e).join(',')
       )
     })
@@ -216,6 +229,29 @@ export default function Reports() {
     a.download = `ticket_report_${monthLabel.replace(/\s/g,'_')}_${new Date().toISOString().slice(0,10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  /** Import CSV: open file picker; on select, read and parse CSV then reload report data if backend supports it */
+  const triggerImportCSV = () => {
+    if (fileInputRef.current) fileInputRef.current.click()
+  }
+  const handleImportCSV = (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const text = reader.result
+        const lines = text.split(/\r?\n/).filter(Boolean)
+        const rows = lines.length < 2 ? 0 : lines.length - 1
+        toast.success(rows ? `CSV loaded: ${rows} data row(s).` : 'CSV file is empty.')
+      } catch (err) {
+        toast.error('Could not read CSV.')
+      }
+    }
+    reader.onerror = () => toast.error('Could not read file.')
+    reader.readAsText(file, 'UTF-8')
   }
 
   /** Export Summary: open a print-ready HTML page → user saves as PDF */
@@ -366,7 +402,6 @@ export default function Reports() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-
             {/* month picker */}
             <div className="flex items-center gap-1.5">
               <svg className="w-4 h-4 text-slate-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -402,14 +437,34 @@ export default function Reports() {
               ))}
             </div>
 
-            {/* export buttons */}
+            {/* import / export buttons */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".csv,text/csv"
+              onChange={handleImportCSV}
+              className="hidden"
+              aria-hidden="true"
+            />
+            <button
+              type="button"
+              onClick={triggerImportCSV}
+              title="Select a CSV file to import"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg shadow-sm hover:bg-emerald-100 hover:border-emerald-300 transition-colors"
+            >
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              </svg>
+              Import CSV
+            </button>
             <button
               onClick={exportPDF}
               disabled={!data || loading}
               title="Opens a print-ready summary — save as PDF from the print dialog"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-rose-700 border border-rose-200 rounded-lg hover:bg-rose-50 transition-colors disabled:opacity-40"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-rose-800 bg-rose-50 border border-rose-200 rounded-lg shadow-sm hover:bg-rose-100 hover:border-rose-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
               </svg>
@@ -419,13 +474,13 @@ export default function Reports() {
               onClick={exportCSV}
               disabled={!data || loading}
               title="Downloads one CSV file: summary breakdown + all ticket records"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-40"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-blue-800 bg-blue-50 border border-blue-200 rounded-lg shadow-sm hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-              Export CSV
+              Download CSV
             </button>
           </div>
         </div>
@@ -604,15 +659,17 @@ export default function Reports() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
-                      <th className="th text-left px-4 py-3">Ticket ID</th>
-                      <th className="th text-left px-4 py-3">Title</th>
+                      <th className="th text-left px-4 py-3">Email</th>
+                      <th className="th text-left px-4 py-3">Department / Business Unit</th>
+                      <th className="th text-left px-4 py-3">Name</th>
+                      <th className="th text-left px-4 py-3">Issue</th>
+                      <th className="th text-left px-4 py-3">Insert Screenshot</th>
                       <th className="th text-left px-4 py-3">Status</th>
-                      <th className="th text-left px-4 py-3">Category</th>
                       <th className="th text-left px-4 py-3">Priority</th>
                       <th className="th text-left px-4 py-3">Assigned To</th>
-                      <th className="th text-left px-4 py-3">Created By</th>
                       <th className="th text-left px-4 py-3">Created At</th>
                       <th className="th text-left px-4 py-3">Archived</th>
+                      <th className="th text-left px-4 py-3">Ticket ID</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -621,17 +678,18 @@ export default function Reports() {
                       const sc = STATUS_COLOR[t.status]    ?? { badge: 'bg-slate-100 text-slate-600' }
                       return (
                         <tr key={t.ticket_id} className={`hover:bg-slate-50 transition-colors ${t.is_archived ? 'bg-blue-50/40' : ''}`}>
-                          <td className="td px-4 py-2.5 font-mono text-xs text-blue-600 font-semibold">{t.ticket_id}</td>
-                          <td className="td px-4 py-2.5 text-slate-800 max-w-xs truncate" title={t.title}>{t.title}</td>
+                          <td className="td px-4 py-2.5 text-slate-700 text-xs">{t.email ?? '—'}</td>
+                          <td className="td px-4 py-2.5 text-slate-600 text-xs">{t.department_business_unit ?? t.category ?? '—'}</td>
+                          <td className="td px-4 py-2.5 text-slate-700 text-xs">{t.name ?? t.created_by ?? '—'}</td>
+                          <td className="td px-4 py-2.5 text-slate-800 max-w-xs truncate" title={t.issue ?? t.title}>{t.issue ?? t.title}</td>
+                          <td className="td px-4 py-2.5 text-slate-300 text-xs">—</td>
                           <td className="td px-4 py-2.5">
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${sc.badge}`}>{t.status}</span>
                           </td>
-                          <td className="td px-4 py-2.5 text-slate-600 text-xs">{t.category}</td>
                           <td className="td px-4 py-2.5">
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${pc.badge}`}>{t.priority}</span>
                           </td>
                           <td className="td px-4 py-2.5 text-slate-700 text-xs">{t.assigned_to}</td>
-                          <td className="td px-4 py-2.5 text-slate-500 text-xs">{t.created_by}</td>
                           <td className="td px-4 py-2.5 text-slate-500 text-xs tabular-nums whitespace-nowrap">
                             {fmtDateTime(t.created_at)}
                           </td>
@@ -641,6 +699,7 @@ export default function Reports() {
                               : <span className="text-xs text-slate-300">—</span>
                             }
                           </td>
+                          <td className="td px-4 py-2.5 font-mono text-xs text-blue-600 font-semibold">{t.ticket_id}</td>
                         </tr>
                       )
                     })}

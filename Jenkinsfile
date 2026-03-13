@@ -10,6 +10,7 @@ pipeline {
     // Adjust if you use a different Python/Node version on your agents
     PYTHON = 'C:/Program Files/Python314/python.exe'
     NODEJS = 'node'
+    APP_PORT = '5000'
   }
 
   stages {
